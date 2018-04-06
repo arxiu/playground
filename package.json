@@ -6,7 +6,8 @@
   "scripts": {
     "test": "npx babel-node test/run.js",
     "compile": "./node_modules/.bin/babel -d lib/ src/",
-    "prepublishOnly": "npm run compile"
+    "prepublishOnly": "npm run compile",
+    "start": "npm run compile && node lib/app.js"
   },
   "repository": {
     "type": "git",
