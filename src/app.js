@@ -1,6 +1,6 @@
-
 const ipfs = require('./ipfsNode')
-const format =  { format: 'dag-cbor', hashAlg: 'sha2-256' }
+const format =  { format: 'dag-cbor', hashAlg: 'sha2-256'}
+const dagCBOR = require('../../arxiu-ipld-hitag')
 
 let baseProps = {
     canRead:[],
@@ -32,10 +32,10 @@ let newHitag = (name)=>
 
 let resolveHitag=(cid, hitagPath, key)=>
 {
-    ipfs.dag.get(cid, 'hitag', (e,r)=>{
+    ipfs.dag.get(cid, 'hitag/hitags/0/name', (e,r)=>{
         console.log(r)
     })
-    hitagPath.split('/')
+    hitagPath.split('')
 }
 
 let getData=(error, data)=>
@@ -55,6 +55,12 @@ let onNewCid=(error, cid)=>
 
 let init=()=>
 {
+    ipfs._ipld.support.rm(dagCBOR.resolver.multicodec)
+    ipfs._ipld.support.add(
+        dagCBOR.resolver.multicodec,
+        dagCBOR.resolver,
+        dagCBOR.util)
+        
     let h1 = newHitag('Unga')
     let h2 = newHitag('Bunga')
     let h3 = newHitag('Xunga')
