@@ -1,46 +1,84 @@
 const ipfs = require('./ipfsNode')
-const format =  { format: 'dag-cbor', hashAlg: 'sha2-256'}
-const dagCBOR = require('../../arxiu-ipld-hitag')
+const hitagDag = require('../../arxiu-ipld-hitag')
+const hitagMulticodec = hitagDag.resolver.multicodec
+const format =  { format: hitagMulticodec , hashAlg: 'sha2-256'}
+console.log(hitagMulticodec)
 
-let baseProps = {
-    canRead:[],
-    canWrite:[],
+let hp1 = 'Unga/Bunga/'
+
+let base = {
     hitags:[],
-    history:[]
+    canRead:["1"]
 }
 
-let getBaseProps=()=>
+let getNewHitag =(name)=>
 {
-    return JSON.parse(JSON.stringify(baseProps));
+    return {
+        name:name,
+        canRead:["1"],
+        canWrite:[],
+        hitags:[],
+        history:[]
+    }
 }
 
 let addChild=(parent, child)=>
 {
-    if(!parent.hitag)
-        parent.hitag =  getBaseProps()
-
-    parent.hitag.hitags.push(child)
+    if(!parent.hitags)
+        parent.hitags = []
+    parent.hitags.push(child)
 }
 
-let newHitag = (name)=>
+let canRead=(currentKeys, inheritKeys, requesterKey)=>
 {
-    return {
-        name: name,
-        hitag: getBaseProps()
-    }
+    if(currentKeys)
+        return (currentKeys.find(key=>key===requesterKey)?true:false)
+    else
+        if(inheritKeys)
+            return (inheritKeys.find(key=>key===requesterKey)?true:false)
+
+    console.error('No keys are defined. No reading will be allowed')
+    return false
 }
 
-let resolveHitag=(cid, hitagPath, key)=>
+let resolveHitagPath=(cid, hitagPath, requesterKey)=>
 {
-    ipfs.dag.get(cid, 'hitag/hitags/0/name', (e,r)=>{
-        console.log(r)
+    let tags = hitagPath.split('/')
+    console.log(tags)
+
+    ipfs.dag.get(cid,'', (e,r)=>{
+        if(e)
+            console.error(e)
+            console.log(r.value)
+        
+        let parent = r.value
+        let inheritReadKeys = parent.canRead
+        let hitag = {}
+
+        for(let i in tags)
+        {
+            let tag= tags[i]
+
+            console.log("parent hitags",parent.hitags)
+            if(!parent.hitags[tag])
+                console.error('Unxexisting path ', tag)
+
+            hitag = parent.hitags[tag]
+
+            if(canRead(hitag.canRead, inheritReadKeys, requesterKey))
+            {
+                inheritReadKeys = hitag.canRead
+                parent = hitag
+            }
+            else
+            {
+                break
+            }
+        }
+
+        return hitag
+    
     })
-    hitagPath.split('')
-}
-
-let getData=(error, data)=>
-{
-    console.log(data.value)
 }
 
 let onNewCid=(error, cid)=>
@@ -50,27 +88,31 @@ let onNewCid=(error, cid)=>
 
     console.log('Added :',cid.toBaseEncodedString('base58btc'))
 
-    resolveHitag(cid,'Bunga','0x123')
+    resolveHitagPath(cid, 'Unga/Bunga',"1")
 }
 
 let init=()=>
 {
-    ipfs._ipld.support.rm(dagCBOR.resolver.multicodec)
+   
+    ipfs._ipld.support.rm('dag-cbor')
     ipfs._ipld.support.add(
-        dagCBOR.resolver.multicodec,
-        dagCBOR.resolver,
-        dagCBOR.util)
+        hitagMulticodec,
+        hitagDag.resolver,
+        hitagDag.util)
         
-    let h1 = newHitag('Unga')
-    let h2 = newHitag('Bunga')
-    let h3 = newHitag('Xunga')
+    let h1 = getNewHitag('Unga')
+    let h2 = getNewHitag('Bunga')
+    let h3 = getNewHitag('Xunga')
 
     addChild(h2, h3)
     addChild(h1, h2)
+    addChild(base, h1)
 
     //console.log(JSON.stringify(h1))
 
-    ipfs.dag.put(h1, format, onNewCid)
+    ipfs.dag.put(base, format, onNewCid)
 }
 
 ipfs.on('start', init)
+
+console.log('Can read', canRead(undefined,["1","2","3"],"2"))
