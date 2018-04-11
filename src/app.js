@@ -4,29 +4,48 @@ const hitagMulticodec = hitagDag.resolver.multicodec
 const format =  { format: hitagMulticodec , hashAlg: 'sha2-256'}
 console.log(hitagMulticodec)
 
-let hp1 = 'Unga/Bunga/'
+let hitagPath = 'Unga/Xunga/'
 
-let base = {
-    hitags:[],
-    canRead:["1"]
+let getBaseProps=()=>
+{
+    return {
+        
+        canWrite:{},
+        hitags:{},
+        history:{}
+    }
 }
 
 let getNewHitag =(name)=>
 {
-    return {
-        name:name,
-        canRead:["1"],
-        canWrite:[],
-        hitags:[],
-        history:[]
-    }
+    let hitag = {}
+    hitag[name]=getBaseProps()
+    return hitag
 }
 
-let addChild=(parent, child)=>
+let addChild=(parent, name, props)=>
 {
     if(!parent.hitags)
-        parent.hitags = []
-    parent.hitags.push(child)
+        parent.hitags={}
+
+    if(parent.hitags[name])
+        throw('The child '+ name + 'already exist in '+parent)
+    
+    if(props)
+        parent.hitags[name] = props
+    else
+        parent.hitags[name] = getBaseProps()
+
+    return parent.hitags[name]
+}
+
+let addReadKey=(parent, key)=>
+{
+    if(!parent.canRead)
+        parent.canRead = []
+    
+    if (key)
+        parent.canRead.push(key)
 }
 
 let canRead=(currentKeys, inheritKeys, requesterKey)=>
@@ -45,33 +64,40 @@ let resolveHitagPath=(cid, hitagPath, requesterKey)=>
 {
     let tags = hitagPath.split('/')
     console.log(tags)
+    let currentPath='/'
 
     ipfs.dag.get(cid,'', (e,r)=>{
         if(e)
             console.error(e)
-            console.log(r.value)
+            console.log('value',r.value)
         
         let parent = r.value
         let inheritReadKeys = parent.canRead
+        
         let hitag = {}
 
         for(let i in tags)
         {
             let tag= tags[i]
 
-            console.log("parent hitags",parent.hitags)
             if(!parent.hitags[tag])
                 console.error('Unxexisting path ', tag)
 
             hitag = parent.hitags[tag]
 
+            console.log(i, tag)
+            currentPath+=tag+'/'
+
+            console.log('can read:' , hitag.canRead, inheritReadKeys, requesterKey)
             if(canRead(hitag.canRead, inheritReadKeys, requesterKey))
             {
+                //TODO, is using the hitag keys and they may come from parent
                 inheritReadKeys = hitag.canRead
                 parent = hitag
             }
             else
             {
+                console.error("No permissions to read " + currentPath)
                 break
             }
         }
@@ -88,7 +114,7 @@ let onNewCid=(error, cid)=>
 
     console.log('Added :',cid.toBaseEncodedString('base58btc'))
 
-    resolveHitagPath(cid, 'Unga/Bunga',"1")
+    resolveHitagPath(cid, hitagPath,"1")
 }
 
 let init=()=>
@@ -99,20 +125,19 @@ let init=()=>
         hitagMulticodec,
         hitagDag.resolver,
         hitagDag.util)
-        
-    let h1 = getNewHitag('Unga')
-    let h2 = getNewHitag('Bunga')
-    let h3 = getNewHitag('Xunga')
+    
+    let h0 = getBaseProps()
+    addReadKey(h0, '1')
+    let h1 = addChild(h0,'Unga')
+    addChild(h0, 'Xunga')
+    addChild(h0, 'Bunga')
+    addChild(h1, 'Xunga')
+    let h2 = addChild(h1,'Bunga')
+    //let h3 = addChild('Xunga')
 
-    addChild(h2, h3)
-    addChild(h1, h2)
-    addChild(base, h1)
-
-    //console.log(JSON.stringify(h1))
-
-    ipfs.dag.put(base, format, onNewCid)
+    ipfs.dag.put(h0, format, onNewCid)
 }
 
 ipfs.on('start', init)
 
-console.log('Can read', canRead(undefined,["1","2","3"],"2"))
+console.log('can read',canRead([],['1'],'1'))
